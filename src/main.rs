@@ -1,7 +1,5 @@
-use clap::{arg, Arg, ArgAction, Command};
-use std::env;
-use std::{collections::HashMap, path::Path, usize};
-
+use clap::{Arg, Command};
+use std::path::Path;
 use whatsapp_stats::{
     db::DatabaseHandler,
     display::{pretty_print_top_speakers, print_hashmap},
@@ -14,65 +12,75 @@ use whatsapp_stats::{
 };
 
 fn main() {
-    let matches = Command::new("MyApp")
+    let matches = Command::new("whatsapp-stats")
         .version("1.0")
-        .about("Does awesome things")
-        .arg(arg!(--file <VALUE>).required(true))
-        .arg(arg!(--word <VALUE>).required(false))
-        .arg(arg!(--phrase <VALUE>).required(false))
-        .arg(arg!(--word_count <VALUE>).required(false))
+        .about("Blazingly fast WhatsApp chat analyzer in Rust 🚀")
         .arg(
-            Arg::new("message_amount")
-                .short('a')
-                .long("message_amount")
-                .action(ArgAction::SetTrue),
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .value_name("FILE")
+                .help("Path to WhatsApp export file")
+                .required(true),
         )
-        .arg(
-            Arg::new("time")
-                .short('t')
-                .long("time")
-                .action(ArgAction::SetTrue),
+        .subcommand_required(true)
+        .subcommand(
+            Command::new("word")
+                .about("Count occurrences of a single word per user")
+                .arg(Arg::new("target").required(false)),
         )
-        .arg(
-            Arg::new("total_word_count")
-                .short('w')
-                .long("total_word_count")
-                .action(ArgAction::SetTrue),
+        .subcommand(
+            Command::new("phrase")
+                .about("Count occurrences of a phrase per user")
+                .arg(Arg::new("target").required(false)),
         )
+        .subcommand(
+            Command::new("word-count")
+                .about("Count occurrences of a word across all messages")
+                .arg(Arg::new("target").required(false)),
+        )
+        .subcommand(
+            Command::new("total-word-count").about("Count total word frequency across the chat"),
+        )
+        .subcommand(Command::new("top-speakers").about("Find top speakers per hour"))
+        .subcommand(Command::new("user-activity").about("Messages sent by each user"))
         .get_matches();
 
-    let file_path: &str = matches.get_one::<String>("file").expect("required");
-
-    let db = DatabaseHandler::new().unwrap();
+    let file_path: &str = matches.get_one::<String>("file").unwrap();
     let parser = Parser::new(Path::new(file_path));
-
     let messages: Vec<Message> = parser.parse().unwrap();
+    let db = DatabaseHandler::new().unwrap();
     db.insert_messages(&messages).unwrap();
 
-    if let Some(word) = matches.get_one::<String>("word") {
-        let stats = count_word_per_user(&messages, word).unwrap();
-        println!("The times \"{}\" was said is: ", word);
-
-        print_hashmap(stats);
-    }
-
-    if let Some(word) = matches.get_one::<String>("phrase") {
-        let stats = count_phrase_per_user(&messages, word).unwrap();
-        println!("The times \"{}\" was said is: ", word);
-        print_hashmap(stats);
-    }
-
-    if let Some(word) = matches.get_one::<String>("word_count") {
-        extract_word_count(&messages, word).unwrap();
-    }
-
-    if matches.get_flag("time") {
-        let hour_speakers = top_speaker_per_hour(&messages[..]).unwrap();
-        pretty_print_top_speakers(&hour_speakers);
-    }
-
-    if matches.get_flag("total_word_count") {
-        let total_word_count = total_word_count(&messages[..]).unwrap();
-        print_hashmap(total_word_count);
+    match matches.subcommand() {
+        Some(("word", sub)) => {
+            let word = sub.get_one::<String>("target").unwrap();
+            let stats = count_word_per_user(&messages, word).unwrap();
+            println!("The times \"{}\" was said is:", word);
+            print_hashmap(stats);
+        }
+        Some(("phrase", sub)) => {
+            let phrase = sub.get_one::<String>("target").unwrap();
+            let stats = count_phrase_per_user(&messages, phrase).unwrap();
+            println!("The times \"{}\" was said is:", phrase);
+            print_hashmap(stats);
+        }
+        Some(("word-count", sub)) => {
+            let word = sub.get_one::<String>("target").unwrap();
+            extract_word_count(&messages, word).unwrap();
+        }
+        Some(("total-word-count", _)) => {
+            let total = total_word_count(&messages).unwrap();
+            print_hashmap(total);
+        }
+        Some(("top-speakers", _)) => {
+            let hour_speakers = top_speaker_per_hour(&messages).unwrap();
+            pretty_print_top_speakers(&hour_speakers);
+        }
+        Some(("user-activity", _)) => {
+            let user_activity = db.get_messages_count().unwrap();
+            print_hashmap(user_activity);
+        }
+        _ => unreachable!(),
     }
 }
