@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{errors::DatabaseError, message::Message};
+use crate::{errors::DatabaseError, message::Message, utils::time_utils::get_hour};
 
 pub fn count_word_per_user(
     messages_array: &[Message],
@@ -112,4 +112,22 @@ pub fn top_speaker_per_hour(
     }
 
     Ok(top_speakers)
+}
+
+pub fn words_sent(messages_array: &[Message]) -> Result<usize, DatabaseError> {
+    let mut count = 0;
+    messages_array.iter().for_each(|m| count += m.text.len());
+    Ok(count)
+}
+
+pub fn most_active_hour(messages_array: &[Message]) -> Result<String, DatabaseError> {
+    let mut count_hashmap: HashMap<String, usize> = HashMap::new();
+    for message in messages_array {
+        let hour = get_hour(&message.hour);
+        *count_hashmap.entry(hour.to_lowercase()).or_insert(0) += 1
+    }
+    let mut data: Vec<(&String, &usize)> = count_hashmap.iter().collect();
+    data.sort_by(|a, b| b.1.cmp(a.1));
+    let (peak_hour, _) = data[0];
+    Ok(peak_hour.to_owned())
 }

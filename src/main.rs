@@ -3,6 +3,7 @@ use std::path::Path;
 use whatsapp_stats::{
     db::DatabaseHandler,
     display::{pretty_print_top_speakers, print_hashmap},
+    html::html::generate_html,
     message::Message,
     parser::Parser,
     stats::{
@@ -44,6 +45,7 @@ fn main() {
         )
         .subcommand(Command::new("top-speakers").about("Find top speakers per hour"))
         .subcommand(Command::new("user-activity").about("Messages sent by each user"))
+        .subcommand(Command::new("html").about("Generate html"))
         .get_matches();
 
     let file_path: &str = matches.get_one::<String>("file").unwrap();
@@ -81,6 +83,11 @@ fn main() {
             let user_activity = db.get_messages_count().unwrap();
             print_hashmap(user_activity);
         }
+        Some(("html", _)) => {
+            let user_activity = db.get_messages_count().unwrap();
+            generate_html(user_activity, &messages[..]);
+        }
+
         _ => unreachable!(),
     }
 }
