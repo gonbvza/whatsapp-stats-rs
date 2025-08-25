@@ -131,3 +131,41 @@ pub fn most_active_hour(messages_array: &[Message]) -> Result<String, DatabaseEr
     let (peak_hour, _) = data[0];
     Ok(peak_hour.to_owned())
 }
+
+pub fn longest_message_length(messages_array: &[Message]) -> Result<usize, DatabaseError> {
+    Ok(messages_array
+        .iter()
+        .map(|m| m.text.len())
+        .max()
+        .unwrap_or(0))
+}
+
+pub fn average_words_per_message(messages_array: &[Message]) -> Result<f64, DatabaseError> {
+    if messages_array.is_empty() {
+        return Ok(0.0);
+    }
+
+    let total_words: usize = messages_array
+        .iter()
+        .map(|m| m.text.split_whitespace().count())
+        .sum();
+
+    Ok(total_words as f64 / messages_array.len() as f64)
+}
+
+pub fn average_messages_per_user(messages_array: &[Message]) -> Result<f64, DatabaseError> {
+    if messages_array.is_empty() {
+        return Ok(0.0);
+    }
+
+    let mut user_counts: HashMap<&str, usize> = HashMap::new();
+
+    for message in messages_array {
+        *user_counts.entry(&message.owner).or_insert(0) += 1;
+    }
+
+    let total_messages = messages_array.len();
+    let unique_users = user_counts.len();
+
+    Ok(total_messages as f64 / unique_users as f64)
+}

@@ -3,7 +3,10 @@ use std::{collections::HashMap, fs, iter::zip};
 
 use crate::{
     message::Message,
-    stats::{audios_count, most_active_hour, top_speaker_per_hour, total_word_count, words_sent},
+    stats::{
+        average_messages_per_user, average_words_per_message, longest_message_length,
+        most_active_hour, top_speaker_per_hour, total_word_count, words_sent,
+    },
 };
 
 #[derive(Template)]
@@ -21,10 +24,9 @@ struct DashboardTemplate<'a> {
     messages_sent: &'a usize,
     active_user: &'a String,
     active_hour: &'a String,
-    multimedia_sent: &'a usize,
     longest_message: &'a usize,
-    average_word: &'a usize,
-    average_message: &'a usize,
+    average_word: &'a f64,
+    average_message: &'a f64,
 }
 
 pub fn generate_html(
@@ -64,9 +66,9 @@ pub fn generate_html(
     let messages_sent = messages_array.len();
     let active_user = &names[0];
     let active_hour = most_active_hour(messages_array).unwrap();
-    let average_message: usize = 3;
-    let average_word: usize = 3;
-    let longest_message: usize = 3;
+    let average_message: f64 = average_messages_per_user(messages_array).unwrap().round();
+    let average_word: f64 = average_words_per_message(messages_array).unwrap().round();
+    let longest_message: usize = longest_message_length(messages_array).unwrap();
 
     let template = DashboardTemplate {
         names: &names,
