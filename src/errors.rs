@@ -22,4 +22,7 @@ pub enum DatabaseError {
 
     #[error("There was an error creating the tables ")]
     TableError,
+
+    #[error("Your target is not found")]
+    NotFound,
 }
