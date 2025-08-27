@@ -1,14 +1,13 @@
 use clap::{Arg, Command};
 use std::path::Path;
 use whatsapp_stats::{
-    db::DatabaseHandler,
     display::{pretty_print_top_speakers, print_hashmap},
     html::html::generate_html,
     message::Message,
     parser::Parser,
     stats::{
-        count_phrase_per_user, count_word_per_user, extract_word_count, top_speaker_per_hour,
-        total_word_count,
+        count_phrase_per_user, count_word_per_user, extract_word_count, messages_per_user,
+        top_speaker_per_hour, total_word_count,
     },
 };
 
@@ -51,8 +50,6 @@ fn main() {
     let file_path: &str = matches.get_one::<String>("file").unwrap();
     let parser = Parser::new(Path::new(file_path));
     let messages: Vec<Message> = parser.parse().unwrap();
-    let db = DatabaseHandler::new().unwrap();
-    db.insert_messages(&messages).unwrap();
 
     match matches.subcommand() {
         Some(("word", sub)) => {
@@ -80,12 +77,11 @@ fn main() {
             pretty_print_top_speakers(&hour_speakers);
         }
         Some(("user-activity", _)) => {
-            let user_activity = db.get_messages_count().unwrap();
+            let user_activity = messages_per_user(&messages).unwrap();
             print_hashmap(user_activity);
         }
         Some(("html", _)) => {
-            let user_activity = db.get_messages_count().unwrap();
-            generate_html(user_activity, &messages[..]);
+            generate_html(&messages[..]).unwrap();
         }
 
         _ => unreachable!(),

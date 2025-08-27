@@ -1,4 +1,3 @@
-pub mod db;
 pub mod display;
 pub mod errors;
 pub mod html;

@@ -1,14 +1,16 @@
 use askama::Template;
-use std::{collections::HashMap, fs, iter::zip};
+use std::fs;
 
 use crate::{
     message::Message,
     stats::{
         average_messages_per_user, average_words_per_message, longest_message_length,
-        most_active_hour, top_speaker_per_hour, total_word_count, words_sent,
+        messages_per_user, most_active_hour, top_speaker_per_hour, total_word_count, words_sent,
     },
 };
 
+/// Template context for rendering the dashboard.
+/// This struct maps directly to the variables available inside `index.html`.
 #[derive(Template)]
 #[template(path = "index.html")]
 struct DashboardTemplate<'a> {
@@ -16,10 +18,8 @@ struct DashboardTemplate<'a> {
     values: &'a [i32],
     words: &'a [String],
     words_count: &'a [i64],
-
     left_schedule: &'a [(String, String)],
     right_schedule: &'a [(String, String)],
-
     words_sent: &'a usize,
     messages_sent: &'a usize,
     active_user: &'a String,
@@ -29,54 +29,65 @@ struct DashboardTemplate<'a> {
     average_message: &'a f64,
 }
 
-pub fn generate_html(
-    user_activity: HashMap<String, i64>,
-    messages_array: &[Message],
-) -> Result<(), Box<dyn std::error::Error>> {
+/// Prepares sorted user activity data (names and counts).
+fn prepare_user_activity(messages: &[Message]) -> (Vec<String>, Vec<i32>) {
+    let user_activity = messages_per_user(&messages).unwrap();
     let mut data: Vec<(String, i32)> = user_activity
         .into_iter()
         .map(|(k, v)| (k, v as i32))
         .collect();
     data.sort_by(|a, b| b.1.cmp(&a.1));
-    let (names, values): (Vec<String>, Vec<i32>) = data.into_iter().unzip();
+    data.into_iter().unzip()
+}
 
-    let total_word_count: HashMap<String, i64> = total_word_count(&messages_array).unwrap();
-    let mut total_word_count: Vec<_> = total_word_count.iter().collect();
-    total_word_count.sort_by(|a, b| b.1.cmp(&a.1));
+/// Prepares the top-N most used words and their counts.
+fn prepare_word_frequencies(messages: &[Message], top_n: usize) -> (Vec<String>, Vec<i64>) {
+    let mut word_counts: Vec<_> = total_word_count(messages).unwrap().into_iter().collect();
+    word_counts.sort_by(|a, b| b.1.cmp(&a.1));
+    word_counts
+        .into_iter()
+        .take(top_n)
+        .map(|(word, count)| (word, count))
+        .unzip()
+}
 
-    let (words, words_count): (Vec<String>, Vec<i64>) = total_word_count[0..20]
-        .iter()
-        .map(|(words, words_count)| ((*words).clone(), (*words_count).clone()))
+/// Prepares two halves (0–11, 12–23) of the top speaker schedule by hour.
+fn prepare_top_speaker_schedule(
+    messages: &[Message],
+) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let mut entries: Vec<_> = top_speaker_per_hour(messages)
+        .unwrap()
+        .into_iter()
         .collect();
-
-    let top_speakers = top_speaker_per_hour(messages_array).unwrap();
-    let mut entries: Vec<_> = top_speakers.iter().collect();
     entries.sort_by_key(|(hour, _)| hour.parse::<i64>().unwrap_or(0));
+    let left = entries[0..12].to_vec();
+    let right = entries[12..24].to_vec();
+    (left, right)
+}
 
-    let left_schedule: Vec<(String, String)> = entries[0..12]
-        .iter()
-        .map(|(hour, name)| ((*hour).clone(), (*name).clone()))
-        .collect();
-    let right_schedule: Vec<(String, String)> = entries[12..24]
-        .iter()
-        .map(|(hour, name)| ((*hour).clone(), (*name).clone()))
-        .collect();
+/// Generates the dashboard HTML and writes it to `output/index.html`.
+/// This function aggregates statistics, prepares the template context,
+/// and renders the final dashboard using Askama.
+pub fn generate_html(messages: &[Message]) -> Result<(), Box<dyn std::error::Error>> {
+    let (names, values) = prepare_user_activity(messages);
+    let (words, words_count) = prepare_word_frequencies(messages, 20);
+    let (left_schedule, right_schedule) = prepare_top_speaker_schedule(messages);
 
-    let words_sent = words_sent(&messages_array).unwrap();
-    let messages_sent = messages_array.len();
+    let words_sent = words_sent(messages).unwrap();
+    let messages_sent = messages.len();
     let active_user = &names[0];
-    let active_hour = most_active_hour(messages_array).unwrap();
-    let average_message: f64 = average_messages_per_user(messages_array).unwrap().round();
-    let average_word: f64 = average_words_per_message(messages_array).unwrap().round();
-    let longest_message: usize = longest_message_length(messages_array).unwrap();
+    let active_hour = most_active_hour(messages).unwrap();
+    let average_message: f64 = average_messages_per_user(messages).unwrap().round();
+    let average_word: f64 = average_words_per_message(messages).unwrap().round();
+    let longest_message: usize = longest_message_length(messages).unwrap();
 
     let template = DashboardTemplate {
         names: &names,
         values: &values,
         words: &words,
         words_count: &words_count,
-        left_schedule: &left_schedule[..],
-        right_schedule: &right_schedule[..],
+        left_schedule: &left_schedule,
+        right_schedule: &right_schedule,
         words_sent: &words_sent,
         messages_sent: &messages_sent,
         active_user,

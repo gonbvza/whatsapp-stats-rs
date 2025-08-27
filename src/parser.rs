@@ -12,13 +12,11 @@ impl<'a> Parser<'a> {
     pub fn new(filepath: &'a Path) -> Self {
         Parser { filepath }
     }
-
     pub fn read_file(&self) -> String {
         let contents =
             fs::read_to_string(&self.filepath).expect("Should have been able to read the file");
         contents
     }
-
     pub fn parse(&self) -> Result<Vec<Message>, ParseError> {
         let content: String = self.read_file();
         let file_rows: Split<'_, &str> = content.split("\n");
@@ -38,5 +36,4 @@ impl<'a> Parser<'a> {
 
         Ok(messages_array)
     }
-
 }

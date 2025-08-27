@@ -18,15 +18,12 @@ impl Message {
         if !line.starts_with('[') {
             return Err(ParseError::NoSplitter);
         }
-
         let end_bracket = line.find(']').ok_or(ParseError::NoSplitter)?;
         let datetime_str = &line[1..end_bracket];
         let rest = line[end_bracket + 1..].trim();
-
         let mut dt_parts = datetime_str.split(", ");
         let date = dt_parts.next().ok_or(ParseError::NoSplitter)?.to_string();
         let hour = dt_parts.next().ok_or(ParseError::NoSplitter)?.to_string();
-
         let mut rest_parts = rest.splitn(2, ':');
         let owner = rest_parts
             .next()
@@ -38,7 +35,6 @@ impl Message {
             .ok_or(ParseError::NoSplitter)?
             .trim()
             .to_string();
-
         Ok(Message {
             date,
             hour,
